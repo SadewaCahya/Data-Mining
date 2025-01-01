@@ -377,6 +377,16 @@ def main():
             row=1, col=2
         )
         
+        # Update layout
+        fig.update_layout(
+            height=600,
+            title_text="Analisis Cluster dan Distribusi Gaji",
+            showlegend=True,
+            template='plotly_white',
+            boxmode='group'
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
 
 if __name__ == "__main__":
     main() 
