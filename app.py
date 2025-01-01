@@ -8,14 +8,12 @@ import plotly.express as px
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
-# Set page config
 st.set_page_config(
     page_title="KERJAAJA - Prediksi & Klasifikasi Level",
     page_icon="💼",
     layout="wide"
 )
 
-# Custom CSS
 st.markdown("""
     <style>
     .main {
@@ -32,7 +30,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Load and prepare data
 @st.cache_data
 def load_data():
     df = pd.read_csv('ds.csv')
@@ -40,13 +37,12 @@ def load_data():
 
 @st.cache_data
 def prepare_model(df):
-    # Prepare features for classification
+    
     X = df[[
         'work_year', 'salary', 'remote_ratio', 
         'company_size', 'employment_type'
     ]]
     
-    # Convert categorical features
     le_dict = {}
     categorical_cols = ['company_size', 'employment_type']
     for col in categorical_cols:
@@ -54,15 +50,12 @@ def prepare_model(df):
         X[col] = le.fit_transform(df[col])
         le_dict[col] = le
     
-    # Convert experience_level to numeric using LabelEncoder
     le = LabelEncoder()
     y = le.fit_transform(df['experience_level'])
     
-    # Scale features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Train model
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
     clf = RandomForestClassifier(n_estimators=100, random_state=42)
     clf.fit(X_train, y_train)
@@ -81,22 +74,18 @@ def perform_clustering(X_scaled, n_clusters=10):
     return clusters
 
 def main():
-    # Header
     st.title("💼 KERJAAJA")
     st.subheader("Sistem Prediksi Level Pengalaman dan Clustering")
 
-    # Load data
     df = load_data()
     clf, scaler, le, le_dict = prepare_model(df)
 
-    # Sidebar for navigation
     st.sidebar.title("Menu")
     page = st.sidebar.radio("Pilih Analisis:", ["Klasifikasi Level", "Clustering Data"])
 
     if page == "Klasifikasi Level":
         st.header("Klasifikasi Level Pengalaman")
         
-        # Input form
         with st.form("classification_form"):
             col1, col2 = st.columns(2)
             
@@ -104,7 +93,7 @@ def main():
                 work_year = st.selectbox(
                     "Tahun Kerja",
                     options=sorted(df['work_year'].unique()),
-                    index=list(sorted(df['work_year'].unique())).index(2023)
+                    index=list(sorted(df['work_year'].unique())).index(2023) if 2023 in df['work_year'].unique() else 0
                 )
                 
                 employment_type = st.selectbox(
@@ -116,51 +105,51 @@ def main():
                 job_title = st.selectbox(
                     "Posisi",
                     options=sorted(df['job_title'].unique()),
-                    index=list(sorted(df['job_title'].unique())).index('Machine Learning Engineer') if 'Machine Learning Engineer' in df['job_title'].unique() else 0
+                    index=0
                 )
                 
                 salary_currency = st.selectbox(
                     "Mata Uang",
                     options=sorted(df['salary_currency'].unique()),
-                    index=list(sorted(df['salary_currency'].unique())).index('USD') if 'USD' in df['salary_currency'].unique() else 0
+                    index=0
                 )
                 
                 salary = st.number_input(
                     "Gaji",
                     min_value=int(df['salary'].min()),
                     max_value=int(df['salary'].max()),
-                    value=121523
+                    value=int(df['salary'].mean())
                 )
-                
-            with col2:
-                employee_residence = st.selectbox(
-                    "Negara Karyawan",
-                    options=sorted(df['employee_residence'].unique()),
-                    index=list(sorted(df['employee_residence'].unique())).index('US') if 'US' in df['employee_residence'].unique() else 0
-                )
-                
-                remote_ratio = st.selectbox(
-                    "Remote Ratio",
-                    options=sorted(df['remote_ratio'].unique()),
-                    index=0
-                )
-                
-                company_location = st.selectbox(
-                    "Lokasi Perusahaan",
-                    options=sorted(df['company_location'].unique()),
-                    index=list(sorted(df['company_location'].unique())).index('US') if 'US' in df['company_location'].unique() else 0
-                )
-                
-                company_size = st.selectbox(
-                    "Ukuran Perusahaan",
-                    options=sorted(df['company_size'].unique()),
-                    index=list(sorted(df['company_size'].unique())).index('M') if 'M' in df['company_size'].unique() else 0
-                )
+            
+        with col2:
+            employee_residence = st.selectbox(
+                "Negara Karyawan",
+                options=sorted(df['employee_residence'].unique()),
+                index=0
+            )
+            
+            remote_ratio = st.selectbox(
+                "Remote Ratio",
+                options=sorted(df['remote_ratio'].unique()),
+                index=0
+            )
+            
+            company_location = st.selectbox(
+                "Lokasi Perusahaan",
+                options=sorted(df['company_location'].unique()),
+                index=0
+            )
+            
+            company_size = st.selectbox(
+                "Ukuran Perusahaan",
+                options=sorted(df['company_size'].unique()),
+                index=0
+            )
             
             submitted = st.form_submit_button("Prediksi Level")
             
             if submitted:
-                # Prepare input data
+                
                 input_data = np.array([[
                     work_year, 
                     salary,
@@ -171,15 +160,12 @@ def main():
                 
                 input_scaled = scaler.transform(input_data)
                 
-                # Make prediction
                 prediction = clf.predict(input_scaled)
                 probabilities = clf.predict_proba(input_scaled)
                 confidence = np.max(probabilities) * 100
                 
-                # Get predicted level
                 predicted_level = le.inverse_transform(prediction)[0]
                 
-                # Show results
                 st.success("Hasil Prediksi Level Pengalaman:")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -187,7 +173,6 @@ def main():
                 with col2:
                     st.metric("Confidence Score", f"{confidence:.2f}%")
                 
-                # Show probability distribution
                 prob_df = pd.DataFrame({
                     'Level': le.classes_,
                     'Probability': probabilities[0] * 100
@@ -201,29 +186,23 @@ def main():
                 )
                 st.plotly_chart(fig)
 
-    else:  # Clustering page
+    else:  
         st.header("Analisis Clustering")
         
-        # Prepare data for clustering
         features = ['job_title', 'salary']
         X = df[features].copy()
         
-        # Convert job_title to numeric
         le_job = LabelEncoder()
         X['job_title'] = le_job.fit_transform(X['job_title'])
         
-        # Scale features
         X_scaled = StandardScaler().fit_transform(X)
         
-        # Clustering parameters
         n_clusters = st.slider("Jumlah Cluster", 2, 10, 5)
         
-        # Perform clustering
         clusters = perform_clustering(X_scaled, n_clusters)
         df_cluster = df.copy()
         df_cluster['Cluster'] = clusters
 
-        # Clustering visualization
         st.subheader("Hasil Clustering")
         pca = PCA(n_components=2)
         X_pca = pca.fit_transform(X_scaled)
@@ -243,7 +222,6 @@ def main():
         )
         st.plotly_chart(fig3, use_container_width=True)
 
-        # Summary statistics
         st.subheader("Statistik Ringkasan")
         col1, col2 = st.columns(2)
 
