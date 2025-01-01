@@ -7,6 +7,9 @@ from sklearn.ensemble import RandomForestClassifier
 import plotly.express as px
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from pycountry import countries
 
 # Set page config
 st.set_page_config(
@@ -25,9 +28,37 @@ st.markdown("""
         width: 100%;
         height: 3em;
         margin-top: 1em;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #45a049;
     }
     .sidebar .sidebar-content {
-        background-color: #f0f2f6;
+        background-color: #f8f9fa;
+    }
+    h1 {
+        color: #1E88E5;
+        font-family: 'Helvetica Neue', sans-serif;
+        padding-bottom: 20px;
+    }
+    h2 {
+        color: #333;
+        font-family: 'Helvetica Neue', sans-serif;
+        padding: 20px 0 10px 0;
+    }
+    h3 {
+        color: #666;
+        font-family: 'Helvetica Neue', sans-serif;
+    }
+    .metric-card {
+        background-color: #ffffff;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -69,16 +100,23 @@ def prepare_model(df):
     
     return clf, scaler, le, le_dict
 
-def perform_clustering(X_scaled, n_clusters=10):
+def perform_clustering(X_scaled, n_clusters=5):
+    # Gunakan silhouette score untuk evaluasi
+    from sklearn.metrics import silhouette_score
+    
     kmeans = KMeans(
         n_clusters=n_clusters,
-        init='random',
+        init='k-means++',  # Gunakan k-means++ untuk inisialisasi yang lebih baik
         max_iter=300,
         n_init=10,
         random_state=42
     )
     clusters = kmeans.fit_predict(X_scaled)
-    return clusters
+    
+    # Hitung silhouette score
+    silhouette_avg = silhouette_score(X_scaled, clusters)
+    
+    return clusters, kmeans, silhouette_avg
 
 def main():
     # Header
@@ -101,15 +139,24 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
+                # Konversi work_year tetap numeric
                 work_year = st.selectbox(
                     "Tahun Kerja",
                     options=sorted(df['work_year'].unique()),
                     index=list(sorted(df['work_year'].unique())).index(2023)
                 )
                 
+                # Konversi employment_type dari singkatan
+                employment_map = {
+                    'FT': 'Full Time',
+                    'PT': 'Part Time',
+                    'CT': 'Contract',
+                    'FL': 'Freelance'
+                }
+                employment_options = [employment_map[et] for et in sorted(df['employment_type'].unique())]
                 employment_type = st.selectbox(
                     "Tipe Pekerjaan",
-                    options=sorted(df['employment_type'].unique()),
+                    options=employment_options,
                     index=0
                 )
                 
@@ -119,6 +166,7 @@ def main():
                     index=list(sorted(df['job_title'].unique())).index('Machine Learning Engineer') if 'Machine Learning Engineer' in df['job_title'].unique() else 0
                 )
                 
+                # Mata uang tetap dalam format singkatan
                 salary_currency = st.selectbox(
                     "Mata Uang",
                     options=sorted(df['salary_currency'].unique()),
@@ -133,40 +181,87 @@ def main():
                 )
                 
             with col2:
+                # Konversi kode negara menjadi nama lengkap
+                def get_country_name(code):
+                    try:
+                        return countries.get(alpha_2=code).name
+                    except:
+                        return code
+                
+                employee_residence_options = [get_country_name(code) for code in sorted(df['employee_residence'].unique())]
                 employee_residence = st.selectbox(
                     "Negara Karyawan",
-                    options=sorted(df['employee_residence'].unique()),
-                    index=list(sorted(df['employee_residence'].unique())).index('US') if 'US' in df['employee_residence'].unique() else 0
+                    options=employee_residence_options,
+                    index=employee_residence_options.index('United States') if 'United States' in employee_residence_options else 0
                 )
                 
+                # Konversi remote_ratio menjadi deskriptif
+                remote_map = {
+                    0: 'No Remote (On-site)',
+                    50: 'Partially Remote',
+                    100: 'Fully Remote'
+                }
+                remote_options = [remote_map[r] for r in sorted(df['remote_ratio'].unique())]
                 remote_ratio = st.selectbox(
-                    "Remote Ratio",
-                    options=sorted(df['remote_ratio'].unique()),
+                    "Tipe Kerja Remote",
+                    options=remote_options,
                     index=0
                 )
                 
+                # Konversi kode negara untuk lokasi perusahaan
+                company_location_options = [get_country_name(code) for code in sorted(df['company_location'].unique())]
                 company_location = st.selectbox(
                     "Lokasi Perusahaan",
-                    options=sorted(df['company_location'].unique()),
-                    index=list(sorted(df['company_location'].unique())).index('US') if 'US' in df['company_location'].unique() else 0
+                    options=company_location_options,
+                    index=company_location_options.index('United States') if 'United States' in company_location_options else 0
                 )
                 
+                # Konversi company_size dari singkatan
+                size_map = {
+                    'S': 'Small',
+                    'M': 'Medium',
+                    'L': 'Large'
+                }
+                company_size_options = [size_map[s] for s in sorted(df['company_size'].unique())]
                 company_size = st.selectbox(
                     "Ukuran Perusahaan",
-                    options=sorted(df['company_size'].unique()),
-                    index=list(sorted(df['company_size'].unique())).index('M') if 'M' in df['company_size'].unique() else 0
+                    options=company_size_options,
+                    index=0
                 )
             
             submitted = st.form_submit_button("Prediksi Level")
             
             if submitted:
-                # Prepare input data
+                # Map back to original values before transformation
+                size_map_reverse = {
+                    'Small': 'S',
+                    'Medium': 'M',
+                    'Large': 'L'
+                }
+                employment_map_reverse = {
+                    'Full Time': 'FT',
+                    'Part Time': 'PT',
+                    'Contract': 'CT',
+                    'Freelance': 'FL'
+                }
+                remote_map_reverse = {
+                    'No Remote (On-site)': 0,
+                    'Partially Remote': 50,
+                    'Fully Remote': 100
+                }
+
+                # Convert back to original format before transformation
+                company_size_orig = size_map_reverse[company_size]
+                employment_type_orig = employment_map_reverse[employment_type]
+                remote_ratio_orig = remote_map_reverse[remote_ratio]
+
+                # Prepare input data with original format values
                 input_data = np.array([[
                     work_year, 
                     salary,
-                    remote_ratio,
-                    le_dict['company_size'].transform([company_size])[0],
-                    le_dict['employment_type'].transform([employment_type])[0]
+                    remote_ratio_orig,  # Use numeric value
+                    le_dict['company_size'].transform([company_size_orig])[0],  # Use abbreviated value
+                    le_dict['employment_type'].transform([employment_type_orig])[0]  # Use abbreviated value
                 ]])
                 
                 input_scaled = scaler.transform(input_data)
@@ -202,7 +297,15 @@ def main():
                 st.plotly_chart(fig)
 
     else:  # Clustering page
-        st.header("Analisis Clustering")
+        st.header("📊 Analisis Clustering")
+        
+        # Tambahkan penjelasan
+        st.markdown("""
+        <div style='background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>
+            <h3 style='color: #1E88E5;'>Tentang Analisis Clustering</h3>
+            <p>Analisis ini mengelompokkan pekerjaan berdasarkan gaji dan posisi untuk menemukan pola dalam data.</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Prepare data for clustering
         features = ['job_title', 'salary']
@@ -215,45 +318,117 @@ def main():
         # Scale features
         X_scaled = StandardScaler().fit_transform(X)
         
-        # Clustering parameters
-        n_clusters = st.slider("Jumlah Cluster", 2, 10, 5)
+        # Clustering parameters dengan UI yang lebih baik
+        col1, col2 = st.columns([2,1])
+        with col1:
+            n_clusters = st.slider(
+                "Jumlah Cluster",
+                min_value=2,
+                max_value=10,
+                value=5,
+                help="Geser untuk mengubah jumlah kelompok"
+            )
         
-        # Perform clustering
-        clusters = perform_clustering(X_scaled, n_clusters)
+        # Perform clustering dengan metrik evaluasi
+        clusters, kmeans, silhouette_avg = perform_clustering(X_scaled, n_clusters)
         df_cluster = df.copy()
         df_cluster['Cluster'] = clusters
 
-        # Clustering visualization
-        st.subheader("Hasil Clustering")
+        # Tampilkan metrik evaluasi
+        with col2:
+            st.metric(
+                "Silhouette Score",
+                f"{silhouette_avg:.3f}",
+                help="Skor 1 menunjukkan clustering terbaik, -1 terburuk"
+            )
+
+        # Visualisasi yang lebih informatif
+        st.subheader("Visualisasi Hasil Clustering")
+        
+        # Buat subplot untuk multiple visualisasi
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('Visualisasi Cluster', 'Distribusi Gaji per Cluster'),
+            specs=[[{'type': 'scatter'}, {'type': 'box'}]]
+        )
+        
+        # PCA visualization dengan warna yang lebih menarik
         pca = PCA(n_components=2)
         X_pca = pca.fit_transform(X_scaled)
         
-        pca_df = pd.DataFrame(
-            data=X_pca,
-            columns=['PC1', 'PC2']
-        )
-        pca_df['Cluster'] = clusters
+        # Custom color palette
+        colors = px.colors.qualitative.Set3[:n_clusters]
         
-        fig3 = px.scatter(
-            pca_df,
-            x='PC1',
-            y='PC2',
-            color='Cluster',
-            title='Visualisasi Cluster berdasarkan Job Title dan Gaji'
+        # Scatter plot
+        for i in range(n_clusters):
+            mask = clusters == i
+            fig.add_trace(
+                go.Scatter(
+                    x=X_pca[mask, 0],
+                    y=X_pca[mask, 1],
+                    mode='markers',
+                    name=f'Cluster {i}',
+                    marker=dict(size=8, color=colors[i]),
+                    showlegend=True
+                ),
+                row=1, col=1
+            )
+        
+        # Box plot
+        fig.add_trace(
+            go.Box(
+                y=df_cluster['salary'],
+                x=df_cluster['Cluster'].astype(str),
+                name='Gaji',
+                marker_color='rgb(107,174,214)'
+            ),
+            row=1, col=2
         )
-        st.plotly_chart(fig3, use_container_width=True)
+        
+        # Update layout
+        fig.update_layout(
+            height=600,
+            title_text="Analisis Cluster dan Distribusi Gaji",
+            showlegend=True,
+            template='plotly_white',
+            boxmode='group'
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
 
-        # Summary statistics
-        st.subheader("Statistik Ringkasan")
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.write("Statistik Gaji per Cluster")
-            st.dataframe(df_cluster.groupby('Cluster')['salary'].describe())
-
-        with col2:
-            st.write("Rata-rata Gaji per Job Title")
-            st.dataframe(df_cluster.groupby('job_title')['salary'].mean().sort_values(ascending=False).head())
+        # Tambahkan analisis statistik yang lebih detail
+        st.subheader("📈 Analisis Statistik Cluster")
+        
+        # Buat tabs untuk berbagai analisis
+        tab1, tab2, tab3 = st.tabs(["Statistik Dasar", "Top Jobs", "Analisis Cluster"])
+        
+        with tab1:
+            st.dataframe(
+                df_cluster.groupby('Cluster')['salary'].describe().style\
+                    .background_gradient(cmap='Blues')
+            )
+        
+        with tab2:
+            st.dataframe(
+                df_cluster.groupby('job_title')['salary']\
+                    .agg(['mean', 'count'])\
+                    .sort_values('mean', ascending=False)\
+                    .head(10)\
+                    .style.background_gradient(cmap='Greens')
+            )
+        
+        with tab3:
+            # Analisis komposisi cluster
+            cluster_composition = df_cluster.groupby(['Cluster', 'job_title']).size()\
+                .reset_index(name='count')
+            
+            # Tampilkan top 3 jobs per cluster
+            for i in range(n_clusters):
+                st.markdown(f"**Cluster {i} - Top Jobs:**")
+                top_jobs = cluster_composition[cluster_composition['Cluster'] == i]\
+                    .sort_values('count', ascending=False)\
+                    .head(3)
+                st.dataframe(top_jobs)
 
 if __name__ == "__main__":
     main() 
