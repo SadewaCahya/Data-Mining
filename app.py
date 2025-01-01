@@ -11,7 +11,7 @@ from sklearn.decomposition import PCA
 # Function to load your data (make sure you adjust this part based on your dataset)
 def load_data():
     # Load the dataset here, e.g., df = pd.read_csv("your_data.csv")
-    df = pd.read_csv("your_data.csv")
+    df = pd.read_csv("ds.csv")
     return df
 
 # Function to prepare the model, scaler, and label encoders
