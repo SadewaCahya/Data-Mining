@@ -299,14 +299,6 @@ def main():
     else:  # Clustering page
         st.header("📊 Analisis Clustering")
         
-        # Tambahkan penjelasan
-        st.markdown("""
-        <div style='background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>
-            <h3 style='color: #1E88E5;'>Tentang Analisis Clustering</h3>
-            <p>Analisis ini mengelompokkan pekerjaan berdasarkan gaji dan posisi untuk menemukan pola dalam data.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
         # Prepare data for clustering
         features = ['job_title', 'salary']
         X = df[features].copy()
@@ -385,50 +377,6 @@ def main():
             row=1, col=2
         )
         
-        # Update layout
-        fig.update_layout(
-            height=600,
-            title_text="Analisis Cluster dan Distribusi Gaji",
-            showlegend=True,
-            template='plotly_white',
-            boxmode='group'
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Tambahkan analisis statistik yang lebih detail
-        st.subheader("📈 Analisis Statistik Cluster")
-        
-        # Buat tabs untuk berbagai analisis
-        tab1, tab2, tab3 = st.tabs(["Statistik Dasar", "Top Jobs", "Analisis Cluster"])
-        
-        with tab1:
-            st.dataframe(
-                df_cluster.groupby('Cluster')['salary'].describe().style\
-                    .background_gradient(cmap='Blues')
-            )
-        
-        with tab2:
-            st.dataframe(
-                df_cluster.groupby('job_title')['salary']\
-                    .agg(['mean', 'count'])\
-                    .sort_values('mean', ascending=False)\
-                    .head(10)\
-                    .style.background_gradient(cmap='Greens')
-            )
-        
-        with tab3:
-            # Analisis komposisi cluster
-            cluster_composition = df_cluster.groupby(['Cluster', 'job_title']).size()\
-                .reset_index(name='count')
-            
-            # Tampilkan top 3 jobs per cluster
-            for i in range(n_clusters):
-                st.markdown(f"**Cluster {i} - Top Jobs:**")
-                top_jobs = cluster_composition[cluster_composition['Cluster'] == i]\
-                    .sort_values('count', ascending=False)\
-                    .head(3)
-                st.dataframe(top_jobs)
 
 if __name__ == "__main__":
     main() 
