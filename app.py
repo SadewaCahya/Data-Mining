@@ -1,66 +1,93 @@
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+import streamlit as st
 import pandas as pd
 import numpy as np
-import streamlit as st
-import plotly.express as px
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+import plotly.express as px
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
-# Function to load your data (make sure you adjust this part based on your dataset)
+# Set page config
+st.set_page_config(
+    page_title="KERJAAJA - Prediksi & Klasifikasi Level",
+    page_icon="💼",
+    layout="wide"
+)
+
+# Custom CSS
+st.markdown("""
+    <style>
+    .main {
+        padding: 0rem 1rem;
+    }
+    .stButton>button {
+        width: 100%;
+        height: 3em;
+        margin-top: 1em;
+    }
+    .sidebar .sidebar-content {
+        background-color: #f0f2f6;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Load and prepare data
+@st.cache_data
 def load_data():
-    # Load the dataset here, e.g., df = pd.read_csv("your_data.csv")
-    df = pd.read_csv("ds.csv")
+    df = pd.read_csv('ds.csv')
     return df
 
-# Function to prepare the model, scaler, and label encoders
+@st.cache_data
 def prepare_model(df):
-    # Label encoding for categorical columns
-    label_encoders = {}
-    for column in df.select_dtypes(include='object').columns:
+    # Prepare features for classification
+    X = df[[
+        'work_year', 'salary', 'remote_ratio', 
+        'company_size', 'employment_type'
+    ]]
+    
+    # Convert categorical features
+    le_dict = {}
+    categorical_cols = ['company_size', 'employment_type']
+    for col in categorical_cols:
         le = LabelEncoder()
-        df[column] = le.fit_transform(df[column])
-        label_encoders[column] = le
-
-    # Split the dataset into features (X) and target (y)
-    X = df.drop(columns=["experience_level"])  # Adjust based on your target column
-    y = df["experience_level"]
-
-    # Scaling the features
+        X[col] = le.fit_transform(df[col])
+        le_dict[col] = le
+    
+    # Convert experience_level to numeric using LabelEncoder
+    le = LabelEncoder()
+    y = le.fit_transform(df['experience_level'])
+    
+    # Scale features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-
-    # Train a Random Forest Classifier
+    
+    # Train model
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
     clf = RandomForestClassifier(n_estimators=100, random_state=42)
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.3, random_state=42)
     clf.fit(X_train, y_train)
     
-    # Evaluate model
-    y_pred = clf.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"Model accuracy: {accuracy:.4f}")
+    return clf, scaler, le, le_dict
 
-    return clf, scaler, label_encoders
-
-# Function for clustering (optional if you want to include this)
-def perform_clustering(X_scaled, n_clusters):
-    from sklearn.cluster import KMeans
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+def perform_clustering(X_scaled, n_clusters=10):
+    kmeans = KMeans(
+        n_clusters=n_clusters,
+        init='random',
+        max_iter=300,
+        n_init=10,
+        random_state=42
+    )
     clusters = kmeans.fit_predict(X_scaled)
     return clusters
 
-# Streamlit main application
 def main():
     # Header
-    st.title("💼 KERJAA KERJAA")
+    st.title("💼 KERJAAJA")
     st.subheader("Sistem Prediksi Level Pengalaman dan Clustering")
 
-    # Load and prepare data
+    # Load data
     df = load_data()
-    
-    # Prepare the model, scaler, and label encoders
-    clf, scaler, label_encoders = prepare_model(df)
+    clf, scaler, le, le_dict = prepare_model(df)
 
     # Sidebar for navigation
     st.sidebar.title("Menu")
@@ -133,28 +160,15 @@ def main():
             submitted = st.form_submit_button("Prediksi Level")
             
             if submitted:
-                # Apply label encoding for user inputs
-                encoded_inputs = []
-                for feature, le in label_encoders.items():
-                    if feature == "work_year":
-                        encoded_inputs.append(work_year)
-                    elif feature == "employment_type":
-                        encoded_inputs.append(le.transform([employment_type])[0])
-                    elif feature == "job_title":
-                        encoded_inputs.append(le.transform([job_title])[0])
-                    elif feature == "salary_currency":
-                        encoded_inputs.append(le.transform([salary_currency])[0])
-                    elif feature == "employee_residence":
-                        encoded_inputs.append(le.transform([employee_residence])[0])
-                    elif feature == "company_location":
-                        encoded_inputs.append(le.transform([company_location])[0])
-                    elif feature == "company_size":
-                        encoded_inputs.append(le.transform([company_size])[0])
-                    else:
-                        encoded_inputs.append(salary)  # For numeric features, just append the salary
+                # Prepare input data
+                input_data = np.array([[
+                    work_year, 
+                    salary,
+                    remote_ratio,
+                    le_dict['company_size'].transform([company_size])[0],
+                    le_dict['employment_type'].transform([employment_type])[0]
+                ]])
                 
-                # Convert input to numpy array and scale it
-                input_data = np.array([encoded_inputs])
                 input_scaled = scaler.transform(input_data)
                 
                 # Make prediction
@@ -163,7 +177,7 @@ def main():
                 confidence = np.max(probabilities) * 100
                 
                 # Get predicted level
-                predicted_level = label_encoders["experience_level"].inverse_transform(prediction)[0]
+                predicted_level = le.inverse_transform(prediction)[0]
                 
                 # Show results
                 st.success("Hasil Prediksi Level Pengalaman:")
@@ -175,7 +189,7 @@ def main():
                 
                 # Show probability distribution
                 prob_df = pd.DataFrame({
-                    'Level': label_encoders["experience_level"].classes_,
+                    'Level': le.classes_,
                     'Probability': probabilities[0] * 100
                 })
                 
@@ -193,6 +207,16 @@ def main():
         # Prepare data for clustering
         features = ['job_title', 'salary']
         X = df[features].copy()
+        
+        # Convert job_title to numeric
+        le_job = LabelEncoder()
+        X['job_title'] = le_job.fit_transform(X['job_title'])
+        
+        # Scale features
+        X_scaled = StandardScaler().fit_transform(X)
+        
+        # Clustering parameters
+        n_clusters = st.slider("Jumlah Cluster", 2, 10, 5)
         
         # Perform clustering
         clusters = perform_clustering(X_scaled, n_clusters)
@@ -232,4 +256,4 @@ def main():
             st.dataframe(df_cluster.groupby('job_title')['salary'].mean().sort_values(ascending=False).head())
 
 if __name__ == "__main__":
-    main()
+    main() 
