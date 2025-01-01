@@ -124,9 +124,10 @@ def main():
     st.title("💼 KERJAAJA")
     st.subheader("Sistem Prediksi Level Pengalaman dan Clustering")
 
-    # Load data
+    # Load and prepare data
     df = load_data()
-    df = update_selectbox_options(df)
+    df = update_selectbox_options(df)  # Apply the replacements here
+    
     clf, scaler, le, le_dict = prepare_model(df)
 
     # Sidebar for navigation
@@ -201,7 +202,7 @@ def main():
             
             if submitted:
                 # Prepare input data
-                input_data = np.array([[
+                input_data = np.array([[ 
                     work_year, 
                     salary,
                     remote_ratio,
@@ -296,4 +297,4 @@ def main():
             st.dataframe(df_cluster.groupby('job_title')['salary'].mean().sort_values(ascending=False).head())
 
 if __name__ == "__main__":
-    main() 
+    main()
