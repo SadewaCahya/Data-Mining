@@ -33,6 +33,30 @@ st.markdown("""
 @st.cache_data
 def load_data():
     df = pd.read_csv('ds.csv')
+    df['experience_level'] = df['experience_level'].replace({
+    'SE': 'Senior',
+    'EN': 'Entry level',
+    'EX': 'Executive level',
+    'MI': 'Mid/Intermediate level',
+    })
+
+    df['employment_type'] = df['employment_type'].replace({
+        'FL': 'Freelancer',
+        'CT': 'Contractor',
+        'FT' : 'Full-time',
+        'PT' : 'Part-time'
+    })
+    df['company_size'] = df['company_size'].replace({
+        'S': 'SMALL',
+        'M': 'MEDIUM',
+        'L' : 'LARGE',
+    })
+    df['remote_ratio'] = df['remote_ratio'].astype(str)
+    df['remote_ratio'] = df['remote_ratio'].replace({
+        '0': 'On-Site',
+        '50': 'Half-Remote',
+        '100' : 'Full-Remote',
+    })
     return df
 
 @st.cache_data
@@ -86,6 +110,7 @@ def main():
     if page == "Klasifikasi Level":
         st.header("Klasifikasi Level Pengalaman")
         
+        # Input form
         with st.form("classification_form"):
             col1, col2 = st.columns(2)
             
@@ -93,7 +118,7 @@ def main():
                 work_year = st.selectbox(
                     "Tahun Kerja",
                     options=sorted(df['work_year'].unique()),
-                    index=list(sorted(df['work_year'].unique())).index(2023) if 2023 in df['work_year'].unique() else 0
+                    index=list(sorted(df['work_year'].unique())).index(2023)
                 )
                 
                 employment_type = st.selectbox(
@@ -105,51 +130,51 @@ def main():
                 job_title = st.selectbox(
                     "Posisi",
                     options=sorted(df['job_title'].unique()),
-                    index=0
+                    index=list(sorted(df['job_title'].unique())).index('Machine Learning Engineer') if 'Machine Learning Engineer' in df['job_title'].unique() else 0
                 )
                 
                 salary_currency = st.selectbox(
                     "Mata Uang",
                     options=sorted(df['salary_currency'].unique()),
-                    index=0
+                    index=list(sorted(df['salary_currency'].unique())).index('USD') if 'USD' in df['salary_currency'].unique() else 0
                 )
                 
                 salary = st.number_input(
                     "Gaji",
                     min_value=int(df['salary'].min()),
                     max_value=int(df['salary'].max()),
-                    value=int(df['salary'].mean())
+                    value=121523
                 )
-            
-        with col2:
-            employee_residence = st.selectbox(
-                "Negara Karyawan",
-                options=sorted(df['employee_residence'].unique()),
-                index=0
-            )
-            
-            remote_ratio = st.selectbox(
-                "Remote Ratio",
-                options=sorted(df['remote_ratio'].unique()),
-                index=0
-            )
-            
-            company_location = st.selectbox(
-                "Lokasi Perusahaan",
-                options=sorted(df['company_location'].unique()),
-                index=0
-            )
-            
-            company_size = st.selectbox(
-                "Ukuran Perusahaan",
-                options=sorted(df['company_size'].unique()),
-                index=0
-            )
+                
+            with col2:
+                employee_residence = st.selectbox(
+                    "Negara Karyawan",
+                    options=sorted(df['employee_residence'].unique()),
+                    index=list(sorted(df['employee_residence'].unique())).index('US') if 'US' in df['employee_residence'].unique() else 0
+                )
+                
+                remote_ratio = st.selectbox(
+                    "Remote Ratio",
+                    options=sorted(df['remote_ratio'].unique()),
+                    index=0
+                )
+                
+                company_location = st.selectbox(
+                    "Lokasi Perusahaan",
+                    options=sorted(df['company_location'].unique()),
+                    index=list(sorted(df['company_location'].unique())).index('US') if 'US' in df['company_location'].unique() else 0
+                )
+                
+                company_size = st.selectbox(
+                    "Ukuran Perusahaan",
+                    options=sorted(df['company_size'].unique()),
+                    index=list(sorted(df['company_size'].unique())).index('M') if 'M' in df['company_size'].unique() else 0
+                )
             
             submitted = st.form_submit_button("Prediksi Level")
             
             if submitted:
-                
+                # Prepare input data
                 input_data = np.array([[
                     work_year, 
                     salary,
@@ -160,12 +185,15 @@ def main():
                 
                 input_scaled = scaler.transform(input_data)
                 
+                # Make prediction
                 prediction = clf.predict(input_scaled)
                 probabilities = clf.predict_proba(input_scaled)
                 confidence = np.max(probabilities) * 100
                 
+                # Get predicted level
                 predicted_level = le.inverse_transform(prediction)[0]
                 
+                # Show results
                 st.success("Hasil Prediksi Level Pengalaman:")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -173,6 +201,7 @@ def main():
                 with col2:
                     st.metric("Confidence Score", f"{confidence:.2f}%")
                 
+                # Show probability distribution
                 prob_df = pd.DataFrame({
                     'Level': le.classes_,
                     'Probability': probabilities[0] * 100
