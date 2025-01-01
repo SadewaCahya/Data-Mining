@@ -11,14 +11,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pycountry import countries
 
-# Set page config
 st.set_page_config(
     page_title="KERJAAJA - Prediksi & Klasifikasi Level",
     page_icon="💼",
     layout="wide"
 )
 
-# Custom CSS
 st.markdown("""
     <style>
     .main {
@@ -63,7 +61,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Load and prepare data
+
 @st.cache_data
 def load_data():
     df = pd.read_csv('ds.csv')
@@ -71,13 +69,12 @@ def load_data():
 
 @st.cache_data
 def prepare_model(df):
-    # Prepare features for classification
+    
     X = df[[
         'work_year', 'salary', 'remote_ratio', 
         'company_size', 'employment_type'
     ]]
     
-    # Convert categorical features
     le_dict = {}
     categorical_cols = ['company_size', 'employment_type']
     for col in categorical_cols:
@@ -85,15 +82,12 @@ def prepare_model(df):
         X[col] = le.fit_transform(df[col])
         le_dict[col] = le
     
-    # Convert experience_level to numeric using LabelEncoder
     le = LabelEncoder()
     y = le.fit_transform(df['experience_level'])
     
-    # Scale features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Train model
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
     clf = RandomForestClassifier(n_estimators=100, random_state=42)
     clf.fit(X_train, y_train)
@@ -101,52 +95,48 @@ def prepare_model(df):
     return clf, scaler, le, le_dict
 
 def perform_clustering(X_scaled, n_clusters=5):
-    # Gunakan silhouette score untuk evaluasi
+    
     from sklearn.metrics import silhouette_score
     
     kmeans = KMeans(
         n_clusters=n_clusters,
-        init='k-means++',  # Gunakan k-means++ untuk inisialisasi yang lebih baik
+        init='k-means++',  
         max_iter=300,
         n_init=10,
         random_state=42
     )
     clusters = kmeans.fit_predict(X_scaled)
     
-    # Hitung silhouette score
     silhouette_avg = silhouette_score(X_scaled, clusters)
     
     return clusters, kmeans, silhouette_avg
 
 def main():
-    # Header
+    
     st.title("💼 KERJAAJA")
     st.subheader("Sistem Prediksi Level Pengalaman dan Clustering")
 
-    # Load data
     df = load_data()
     clf, scaler, le, le_dict = prepare_model(df)
 
-    # Sidebar for navigation
     st.sidebar.title("Menu")
     page = st.sidebar.radio("Pilih Analisis:", ["Klasifikasi Level", "Clustering Data"])
 
     if page == "Klasifikasi Level":
         st.header("Klasifikasi Level Pengalaman")
         
-        # Input form
         with st.form("classification_form"):
             col1, col2 = st.columns(2)
             
             with col1:
-                # Konversi work_year tetap numeric
+               
                 work_year = st.selectbox(
                     "Tahun Kerja",
                     options=sorted(df['work_year'].unique()),
                     index=list(sorted(df['work_year'].unique())).index(2023)
                 )
                 
-                # Konversi employment_type dari singkatan
+                
                 employment_map = {
                     'FT': 'Full Time',
                     'PT': 'Part Time',
@@ -166,7 +156,7 @@ def main():
                     index=list(sorted(df['job_title'].unique())).index('Machine Learning Engineer') if 'Machine Learning Engineer' in df['job_title'].unique() else 0
                 )
                 
-                # Mata uang tetap dalam format singkatan
+                
                 salary_currency = st.selectbox(
                     "Mata Uang",
                     options=sorted(df['salary_currency'].unique()),
@@ -181,7 +171,7 @@ def main():
                 )
                 
             with col2:
-                # Konversi kode negara menjadi nama lengkap
+                
                 def get_country_name(code):
                     try:
                         return countries.get(alpha_2=code).name
@@ -195,7 +185,6 @@ def main():
                     index=employee_residence_options.index('United States') if 'United States' in employee_residence_options else 0
                 )
                 
-                # Konversi remote_ratio menjadi deskriptif
                 remote_map = {
                     0: 'No Remote (On-site)',
                     50: 'Partially Remote',
@@ -208,7 +197,6 @@ def main():
                     index=0
                 )
                 
-                # Konversi kode negara untuk lokasi perusahaan
                 company_location_options = [get_country_name(code) for code in sorted(df['company_location'].unique())]
                 company_location = st.selectbox(
                     "Lokasi Perusahaan",
@@ -216,7 +204,6 @@ def main():
                     index=company_location_options.index('United States') if 'United States' in company_location_options else 0
                 )
                 
-                # Konversi company_size dari singkatan
                 size_map = {
                     'S': 'Small',
                     'M': 'Medium',
@@ -232,7 +219,7 @@ def main():
             submitted = st.form_submit_button("Prediksi Level")
             
             if submitted:
-                # Map back to original values before transformation
+                
                 size_map_reverse = {
                     'Small': 'S',
                     'Medium': 'M',
@@ -250,31 +237,26 @@ def main():
                     'Fully Remote': 100
                 }
 
-                # Convert back to original format before transformation
                 company_size_orig = size_map_reverse[company_size]
                 employment_type_orig = employment_map_reverse[employment_type]
                 remote_ratio_orig = remote_map_reverse[remote_ratio]
 
-                # Prepare input data with original format values
                 input_data = np.array([[
                     work_year, 
                     salary,
-                    remote_ratio_orig,  # Use numeric value
-                    le_dict['company_size'].transform([company_size_orig])[0],  # Use abbreviated value
-                    le_dict['employment_type'].transform([employment_type_orig])[0]  # Use abbreviated value
+                    remote_ratio_orig,  
+                    le_dict['company_size'].transform([company_size_orig])[0],  
+                    le_dict['employment_type'].transform([employment_type_orig])[0]  
                 ]])
                 
                 input_scaled = scaler.transform(input_data)
                 
-                # Make prediction
                 prediction = clf.predict(input_scaled)
                 probabilities = clf.predict_proba(input_scaled)
                 confidence = np.max(probabilities) * 100
                 
-                # Get predicted level
                 predicted_level = le.inverse_transform(prediction)[0]
                 
-                # Show results
                 st.success("Hasil Prediksi Level Pengalaman:")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -282,7 +264,6 @@ def main():
                 with col2:
                     st.metric("Confidence Score", f"{confidence:.2f}%")
                 
-                # Show probability distribution
                 prob_df = pd.DataFrame({
                     'Level': le.classes_,
                     'Probability': probabilities[0] * 100
@@ -296,21 +277,17 @@ def main():
                 )
                 st.plotly_chart(fig)
 
-    else:  # Clustering page
+    else:  
         st.header("📊 Analisis Clustering")
         
-        # Prepare data for clustering
         features = ['job_title', 'salary']
         X = df[features].copy()
         
-        # Convert job_title to numeric
         le_job = LabelEncoder()
         X['job_title'] = le_job.fit_transform(X['job_title'])
         
-        # Scale features
         X_scaled = StandardScaler().fit_transform(X)
         
-        # Clustering parameters dengan UI yang lebih baik
         col1, col2 = st.columns([2,1])
         with col1:
             n_clusters = st.slider(
@@ -321,12 +298,10 @@ def main():
                 help="Geser untuk mengubah jumlah kelompok"
             )
         
-        # Perform clustering dengan metrik evaluasi
         clusters, kmeans, silhouette_avg = perform_clustering(X_scaled, n_clusters)
         df_cluster = df.copy()
         df_cluster['Cluster'] = clusters
 
-        # Tampilkan metrik evaluasi
         with col2:
             st.metric(
                 "Silhouette Score",
@@ -334,24 +309,19 @@ def main():
                 help="Skor 1 menunjukkan clustering terbaik, -1 terburuk"
             )
 
-        # Visualisasi yang lebih informatif
         st.subheader("Visualisasi Hasil Clustering")
         
-        # Buat subplot untuk multiple visualisasi
         fig = make_subplots(
             rows=1, cols=2,
             subplot_titles=('Visualisasi Cluster', 'Distribusi Gaji per Cluster'),
             specs=[[{'type': 'scatter'}, {'type': 'box'}]]
         )
         
-        # PCA visualization dengan warna yang lebih menarik
         pca = PCA(n_components=2)
         X_pca = pca.fit_transform(X_scaled)
         
-        # Custom color palette
         colors = px.colors.qualitative.Set3[:n_clusters]
         
-        # Scatter plot
         for i in range(n_clusters):
             mask = clusters == i
             fig.add_trace(
@@ -366,7 +336,6 @@ def main():
                 row=1, col=1
             )
         
-        # Box plot
         fig.add_trace(
             go.Box(
                 y=df_cluster['salary'],
@@ -377,7 +346,6 @@ def main():
             row=1, col=2
         )
         
-        # Update layout
         fig.update_layout(
             height=600,
             title_text="Analisis Cluster dan Distribusi Gaji",
