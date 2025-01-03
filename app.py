@@ -43,7 +43,7 @@ def load_model():
         if key not in model:
             raise KeyError(f"Key '{key}' is missing in the loaded model.")
     
-    return model['classifier'], model['scaler'], model['label_encoder'], model['label_encoders']
+    return model.get('classifier'), model.get('scaler'), model.get('label_encoder'), model.get('label_encoders')
 
 def perform_clustering(X_scaled, n_clusters=10):
     kmeans = KMeans(
