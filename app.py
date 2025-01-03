@@ -35,7 +35,14 @@ def load_data():
 
 @st.cache_data
 def load_model():
-    model = pickle.load('model.pkl')
+    with open('model.pkl', 'rb') as file:
+        model = pickle.load(file)
+    
+    required_keys = ['classifier', 'scaler', 'label_encoder', 'label_encoders']
+    for key in required_keys:
+        if key not in model:
+            raise KeyError(f"Key '{key}' is missing in the loaded model.")
+    
     return model['classifier'], model['scaler'], model['label_encoder'], model['label_encoders']
 
 def perform_clustering(X_scaled, n_clusters=10):
