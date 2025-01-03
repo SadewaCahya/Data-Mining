@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 
 st.set_page_config(
     page_title="KERJAAJA - Prediksi & Klasifikasi Level",
-    page_icon="\ud83d\udcbc",
+    page_icon="💼",
     layout="wide"
 )
 
