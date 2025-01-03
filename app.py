@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
+import pickle
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 import plotly.express as px
 from sklearn.cluster import KMeans
@@ -35,7 +35,7 @@ def load_data():
 
 @st.cache_data
 def load_model():
-    model = joblib.load('model.pkl')
+    model = pickle.load('model.pkl')
     return model['classifier'], model['scaler'], model['label_encoder'], model['label_encoders']
 
 def perform_clustering(X_scaled, n_clusters=10):
