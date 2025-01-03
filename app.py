@@ -57,7 +57,7 @@ def perform_clustering(X_scaled, n_clusters=10):
     return clusters
 
 def main():
-    st.title("\ud83d\udcbc KERJAAJA")
+    st.title("💼 KERJAAJA")
     st.subheader("Sistem Prediksi Level Pengalaman dan Clustering")
 
     df = load_data()
